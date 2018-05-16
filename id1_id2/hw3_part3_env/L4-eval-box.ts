@@ -16,12 +16,19 @@ import { parseL4 } from "./L4-ast-box";
 import { applyEnv, applyEnvBdg, globalEnvAddBinding, makeExtEnv, setFBinding,
          theGlobalEnv, Env } from "./L4-env-box";
 import { isClosure4, isCompoundSExp4, isSExp4, makeClosure4, makeCompoundSExp4,
-         Closure4, CompoundSExp4, SExp4, Value4 } from "./L4-value-box";
+         Closure4, CompoundSExp4, SExp4, Value4, Thunk, isThunk, makeThunk } from "./L4-value-box";
 import { getErrorMessages, hasNoError, isError }  from "./error";
 import { allT, first, rest, second } from './list';
+import { makeProgram4 } from "./L4-ast";
 
 // ========================================================
 // Eval functions
+
+const forceValue = (val : Value4 | Error) : Value4 | Error => {
+        return isThunk(val)?
+            forceValue(evalExps(val.exp, val.env)) : 
+            val;
+}
 
 const L4applicativeEval = (exp: CExp4 | Error, env: Env): Value4 | Error =>
     isError(exp)  ? exp :
@@ -41,6 +48,30 @@ const L4applicativeEval = (exp: CExp4 | Error, env: Env): Value4 | Error =>
                                           exp.rands)) :
     Error(`Bad L4 AST ${exp}`);
 
+const L4normalEval = (exp: CExp4 | Error, env: Env): Value4 | Error =>{
+    return isAppExp4(exp) ? L4evalAppExp_normal(exp, env) :
+    
+    L4applicativeEval(exp, env)
+}
+
+const L4evalAppExp_normal = (exp: AppExp4, env: Env): Value4 | Error =>
+{
+    let proc = forceValue(L4applicativeEval(exp.rator, env))
+    let args = map((rand) => makeThunk(rand, env), exp.rands)
+    
+    return isError(proc) ? proc :
+    !hasNoError(args) ? Error(`Bad argument: ${getErrorMessages(args)}`) :
+    isPrimOp(proc) ? applyPrimitive(proc, map(args, forceValue)) :
+    isClosure4(proc) ? L4applyClosure_normal(proc, args as Value4[]) :
+    Error(`Bad procedure ${JSON.stringify(proc)}`);
+}
+
+const L4applyClosure_normal = (proc: Closure4, args: Value4[]): Value4 | Error => {
+    let vars = map((v: VarDecl) => v.var, proc.params);
+    let newEnv = makeExtEnv(vars, args, proc.env)
+
+    return makeThunk(proc.body, newEnv)
+}
 export const isTrueValue = (x: Value4 | Error): boolean | Error =>
     isError(x) ? x :
     ! (x === false);
@@ -61,7 +92,7 @@ const evalProc4 = (exp: ProcExp4, env: Env): Closure4 =>
 const L4applyProcedure = (proc: Value4 | Error, args: Array<Value4 | Error>): Value4 | Error =>
     isError(proc) ? proc :
     !hasNoError(args) ? Error(`Bad argument: ${getErrorMessages(args)}`) :
-    isPrimOp(proc) ? applyPrimitive(proc, args) :
+    isPrimOp(proc) ? applyPrimitive(proc, map(args, forceValue)) :
     isClosure4(proc) ? applyClosure4(proc, args) :
     Error(`Bad procedure ${JSON.stringify(proc)}`);
 
@@ -74,8 +105,8 @@ const applyClosure4 = (proc: Closure4, args: Value4[]): Value4 | Error => {
 export const evalExps = (exps: Exp4[], env: Env): Value4 | Error =>
     isEmpty(exps) ? Error("Empty program") :
     isDefineExp4(first(exps)) ? evalDefineExps4(exps) :
-    isEmpty(rest(exps)) ? L4applicativeEval(first(exps), env) :
-    isError(L4applicativeEval(first(exps), env)) ? Error("error") :
+    isEmpty(rest(exps)) ? L4normalEval(first(exps), env) :
+    isError(L4normalEval(first(exps), env)) ? Error("error") :
     evalExps(rest(exps), env);
 
 // L4-BOX @@
@@ -213,8 +244,8 @@ const cdrPrim = (v: Value4): Value4 | Error =>
     Error(`Cdr: param is not compound ${v}`);
 
 const consPrim = (v: Value4, lv: Value4): CompoundSExp4 | Error =>
-    isEmptySExp(lv) ? makeCompoundSExp4([v]) :
-    isCompoundSExp4(lv) ? makeCompoundSExp4([v].concat(lv.val)) :
+    isEmptySExp(lv) ? makeCompoundSExp4([v as SExp4]) :
+    isCompoundSExp4(lv) ? makeCompoundSExp4([v as SExp4].concat(lv.val)) :
     Error(`Cons: 2nd param is not empty or compound ${lv}`);
 
 const isListPrim = (v: Value4): boolean =>
@@ -228,9 +259,9 @@ export const evalL4program = (program: Program4): Value4 | Error =>
 export const evalParse4 = (s: string): Value4 | Error => {
     let ast: Parsed4 | Error = parseL4(s);
     if (isProgram4(ast)) {
-        return evalL4program(ast);
+        return forceValue(evalL4program(ast));
     } else if (isExp4(ast)) {
-        return evalExps([ast], theGlobalEnv);
+        return forceValue(evalExps([ast], theGlobalEnv));
     } else {
         return ast;
     }

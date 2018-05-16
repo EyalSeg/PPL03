@@ -5,6 +5,7 @@ import { all, filter, map } from "ramda";
 // Error handling
 export const isError = (x: any): x is Error => x instanceof Error;
 
+
 // Type predicate that warrants that an array does not contain errors.
 // Needed for safeFL
 export const hasNoError = <T1>(x: Array<T1 | Error>): x is T1[] => filter(isError, x).length === 0;
