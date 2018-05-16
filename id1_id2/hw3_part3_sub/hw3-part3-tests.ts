@@ -6,3 +6,4 @@ assert.deepEqual(evalParse(`
     ((lambda ((f lazy)) 1) (loop 0)))`),
     1);
 
+console.log("DONE~~~")

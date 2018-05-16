@@ -56,7 +56,7 @@ export interface BoolExp {tag: "BoolExp"; val: boolean; };
 export interface StrExp {tag: "StrExp"; val: string; };
 export interface PrimOp {tag: "PrimOp"; op: string; };
 export interface VarRef {tag: "VarRef"; var: string; };
-export interface VarDecl {tag: "VarDecl"; var: string; };
+export interface VarDecl {tag: "VarDecl"; var: string; isLazy: boolean};
 export interface AppExp {tag: "AppExp"; rator: CExp; rands: CExp[]; };
 // L2
 export interface IfExp {tag: "IfExp"; test: CExp; then: CExp; alt: CExp; };
@@ -75,24 +75,42 @@ export const makeBoolExp = (b: boolean): BoolExp => ({tag: "BoolExp", val: b});
 export const makeStrExp = (s: string): StrExp => ({tag: "StrExp", val: s});
 export const makePrimOp = (op: string): PrimOp => ({tag: "PrimOp", op: op});
 export const makeVarRef = (v: string): VarRef => ({tag: "VarRef", var: v});
-export const makeVarDecl = (v: string): VarDecl => ({tag: "VarDecl", var: v});
+export const makeVarDecl = (v: string | string[]): VarDecl => {
+    if (isArray(v))
+    // TODO: check if v[1] is "lazy"
+        return ({tag: "VarDecl", var: v[0], isLazy: true});
+    
+    else
+        return ({tag: "VarDecl", var: v.toString(), isLazy: false}) 
+}
 export const makeAppExp = (rator: CExp, rands: CExp[]): AppExp =>
-    ({tag: "AppExp", rator: rator, rands: rands});
+
+
+({tag: "AppExp", rator: rator, rands: rands});
+
 // L2
+
 export const makeIfExp = (test: CExp, then: CExp, alt: CExp): IfExp =>
-    ({tag: "IfExp", test: test, then: then, alt: alt});
+({tag: "IfExp", test: test, then: then, alt: alt});
+
 export const makeProcExp = (args: VarDecl[], body: CExp[]): ProcExp =>
-    ({tag: "ProcExp", args: args, body: body});
+({tag: "ProcExp", args: args, body: body});
+
 export const makeBinding = (v: VarDecl, val: CExp): Binding =>
-    ({tag: "Binding", var: v, val: val});
+({tag: "Binding", var: v, val: val});
+
 export const makeLetExp = (bindings: Binding[], body: CExp[]): LetExp =>
-    ({tag: "LetExp", bindings: bindings, body: body});
+({tag: "LetExp", bindings: bindings, body: body});
+
 // L3
+
 export const makeLitExp = (val: SExp): LitExp =>
-    ({tag: "LitExp", val: val});
+({tag: "LitExp", val: val});
 
 // Type predicates for disjoint types
+
 export const isProgram = (x: any): x is Program => x.tag === "Program";
+
 export const isDefineExp = (x: any): x is DefineExp => x.tag === "DefineExp";
 
 export const isNumExp = (x: any): x is NumExp => x.tag === "NumExp";

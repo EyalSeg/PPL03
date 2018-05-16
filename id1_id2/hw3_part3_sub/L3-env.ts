@@ -1,6 +1,8 @@
 // ========================================================
 // Environment data type for L3
 import { Value } from './L3-value';
+import { CExp } from './L3-ast';
+export type Thunk = {exp : CExp, env : Env}
 
 export type Env = EmptyEnv | NonEmptyEnv;
 export interface EmptyEnv {tag: "EmptyEnv" };
@@ -10,6 +12,7 @@ export interface NonEmptyEnv {
     val: Value;
     nextEnv: Env;
 };
+
 export const makeEmptyEnv = (): EmptyEnv => ({tag: "EmptyEnv"});
 export const makeEnv = (v: string, val: Value, env: Env): NonEmptyEnv =>
     ({tag: "Env", var: v, val: val, nextEnv: env});

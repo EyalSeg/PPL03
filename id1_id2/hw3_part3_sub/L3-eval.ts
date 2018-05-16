@@ -15,6 +15,7 @@ import { isClosure, isCompoundSExp, isEmptySExp, isSymbolSExp, isSExp,
          Closure, CompoundSExp, SExp, Value } from "./L3-value";
 import { getErrorMessages, hasNoError, isError }  from "./error";
 import { allT, first, rest, second } from './list';
+import { L3normalApplyProc, L3normalEval, evalExps as normalEvalExps} from "./L3-normal";
 
 // ========================================================
 // Eval functions
@@ -29,11 +30,60 @@ const L3applicativeEval = (exp: CExp | Error, env: Env): Value | Error =>
     isLitExp(exp) ? exp.val :
     isIfExp(exp) ? evalIf(exp, env) :
     isProcExp(exp) ? evalProc(exp, env) :
-    isAppExp(exp) ? L3applyProcedure(L3applicativeEval(exp.rator, env),
-                                     map((rand) => L3applicativeEval(rand, env),
-                                         exp.rands),
-                                     env) :
+    //if thunk appEval(thunk.exp, thunk.env)
+    isAppExp(exp) ? evalAppExp_allowLazy(exp, env) :
     Error(`Bad L3 AST ${exp}`);
+
+
+const evalAppExp_allowLazy=(exp : AppExp | Error, env : Env) : Value | Error =>{
+    if (isError(exp)) return exp
+    //!hasNoError(args) ? Error(`Bad argument: ${getErrorMessages(args)}`) :
+    if (isPrimOp(exp.rator))
+    {
+        let operator = L3applicativeEval(exp.rator, env)   
+        return L3applyProcedure(
+                                    operator, map((rand) => L3applicativeEval(rand, env), exp.rands),
+                                    env)
+    }
+    if (isProcExp(exp.rator)){
+        let closure = L3applicativeEval(exp.rator, env) as Closure
+        let dec_and_rands = zip(exp.rator.args, exp.rands)
+        let evaluated_args = dec_and_rands.map((tuple) => 
+            tuple[0].isLazy? 
+                //valueToLitExp(tuple[1]) : 
+                tuple[1] :
+                valueToLitExp(L3applicativeEval(tuple[1], env) as Value))
+
+            let vars = map((v: VarDecl) => v.var, exp.rator.args);
+            let body = renameExps(closure.body);
+
+            //let substituted = substitute(body, vars, evaluated_args)
+            
+            return normalEvalExps(substitute(body, vars, evaluated_args), env);
+            //return L3normalApplyProc()
+
+            // if (substituted.length != 1)
+            //     console.log("CRITICAL ERROR!!!~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+            // return L3normalEval(substituted[0], env)
+                //let litArgs = map(valueToLitExp, args);
+            //return normalEvalExps(substitute(body, vars, evaluated_args), env)
+            }
+      
+    return Error("Bad procedure " + JSON.stringify(exp))
+}
+// const L3Eval_AllowLazy = (exp: CExp | Error, env: Env): Value | Thunk | Error => {
+//     // TODO: if lazy return thunk
+
+//     if (isAppExp(exp)){
+//         if (isProcExp(exp.rator))
+//             return L3applyProcedure(L3applicativeEval(exp.rator, env),
+//             map((rand) => L3applicativeEval(rand, env),
+//                 exp.rands),
+//             env)
+//     }
+
+//     return L3applicativeEval(exp, env)
+// }
 
 export const isTrueValue = (x: Value | Error): boolean | Error =>
     isError(x) ? x :
@@ -44,7 +94,7 @@ const evalIf = (exp: IfExp, env: Env): Value | Error => {
     return isError(test) ? test :
         isTrueValue(test) ? L3applicativeEval(exp.then, env) :
         L3applicativeEval(exp.alt, env);
-};
+}
 
 const evalProc = (exp: ProcExp, env: Env): Value =>
     makeClosure(exp.args, exp.body);
@@ -72,6 +122,13 @@ const applyClosure = (proc: Closure, args: Value[], env: Env): Value | Error => 
     return evalExps(substitute(body, vars, litArgs), env);
 }
 
+// @ some of the args are evaluated and some are not
+const applyClosure_lazy = (proc: Closure, args: Value[], env: Env): Value | Error => {
+    let vars = map((v: VarDecl) => v.var, proc.params);
+    let body = renameExps(proc.body);
+    let litArgs = map(valueToLitExp, args);
+    return evalExps(substitute(body, vars, litArgs), env);
+}
 // For applicative eval - the type of exps should be ValueExp[] | VarRef[];
 // where ValueExp is an expression which directly encodes a value:
 // export type ValueExp = LitExp | NumExp | BoolExp | StrExp | PrimOp;
