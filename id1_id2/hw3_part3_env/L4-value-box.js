@@ -8,7 +8,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var L3_ast_1 = require("./L3-ast");
 var L3_value_1 = require("./L3-value");
 exports.isThunk = function (x) { return x.tag === 'Thunk'; };
-exports.makeThunk = function (exp, env) { return { tag: 'Thunk', exp: exp, env: env }; };
+exports.makeThunk = function (exp, env) { return { tag: 'Thunk', exp: exp, env: env, val: undefined }; };
 exports.isFunctional = function (x) { return L3_ast_1.isPrimOp(x) || exports.isClosure4(x); };
 ;
 exports.makeClosure4 = function (params, body, env) {

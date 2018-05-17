@@ -15,9 +15,16 @@ var list_1 = require("./list");
 // ========================================================
 // Eval functions
 var forceValue = function (val) {
-    return L4_value_box_1.isThunk(val) ?
-        forceValue(exports.evalExps(val.exp, val.env)) :
-        val;
+    if (L4_value_box_1.isThunk(val)) {
+        if (val.val === undefined)
+            if (L3_ast_1.isArray(val.exp))
+                val.val = forceValue(exports.evalExps(val.exp, val.env));
+            else
+                val.val = forceValue(L4applicativeEval(val.exp, val.env));
+        return val.val;
+    }
+    else
+        return val;
 };
 var L4applicativeEval = function (exp, env) {
     return error_1.isError(exp) ? exp :
@@ -32,19 +39,15 @@ var L4applicativeEval = function (exp, env) {
                                         L4_ast_box_1.isLetExp4(exp) ? evalLet4(exp, env) :
                                             L4_ast_box_1.isLetrecExp4(exp) ? evalLetrec4(exp, env) :
                                                 L4_ast_box_1.isSetExp4(exp) ? evalSet(exp, env) :
-                                                    L4_ast_box_1.isAppExp4(exp) ? L4applyProcedure(L4applicativeEval(exp.rator, env), ramda_1.map(function (rand) { return L4applicativeEval(rand, env); }, exp.rands)) :
+                                                    L4_ast_box_1.isAppExp4(exp) ? L4evalAppExp_normal(exp, env) :
                                                         Error("Bad L4 AST " + exp);
-};
-var L4normalEval = function (exp, env) {
-    return L4_ast_box_1.isAppExp4(exp) ? L4evalAppExp_normal(exp, env) :
-        L4applicativeEval(exp, env);
 };
 var L4evalAppExp_normal = function (exp, env) {
     var proc = forceValue(L4applicativeEval(exp.rator, env));
     var args = ramda_1.map(function (rand) { return L4_value_box_1.makeThunk(rand, env); }, exp.rands);
     return error_1.isError(proc) ? proc :
         !error_1.hasNoError(args) ? Error("Bad argument: " + error_1.getErrorMessages(args)) :
-            L3_ast_2.isPrimOp(proc) ? exports.applyPrimitive(proc, ramda_1.map(args, forceValue)) :
+            L3_ast_2.isPrimOp(proc) ? exports.applyPrimitive(proc, args) :
                 L4_value_box_1.isClosure4(proc) ? L4applyClosure_normal(proc, args) :
                     Error("Bad procedure " + JSON.stringify(proc));
 };
@@ -58,7 +61,7 @@ exports.isTrueValue = function (x) {
         !(x === false);
 };
 var evalIf4 = function (exp, env) {
-    var test = L4applicativeEval(exp.test, env);
+    var test = forceValue(L4applicativeEval(exp.test, env));
     return error_1.isError(test) ? test :
         exports.isTrueValue(test) ? L4applicativeEval(exp.then, env) :
             L4applicativeEval(exp.alt, env);
@@ -85,8 +88,8 @@ exports.evalExps = function (exps, env) {
     return L3_ast_1.isEmpty(exps) ? Error("Empty program") :
         L4_ast_box_1.isDefineExp4(list_1.first(exps)) ? evalDefineExps4(exps) :
             // isEmpty(rest(exps)) ? L4normalEval(first(exps), env) :
-            exps.length == 1 ? L4normalEval(list_1.first(exps), env) :
-                error_1.isError(L4normalEval(list_1.first(exps), env)) ? Error("error") :
+            exps.length == 1 ? L4applicativeEval(list_1.first(exps), env) :
+                error_1.isError(L4applicativeEval(list_1.first(exps), env)) ? Error("error") :
                     exports.evalExps(list_1.rest(exps), env);
 };
 // L4-BOX @@
@@ -155,24 +158,25 @@ var evalSet = function (exp, env) {
 // Primitives
 // @Pre: none of the args is an Error (checked in applyProcedure)
 exports.applyPrimitive = function (proc, args) {
-    return proc.op === "+" ? (list_1.allT(L3_ast_1.isNumber, args) ? ramda_1.reduce(function (x, y) { return x + y; }, 0, args) : Error("+ expects numbers only")) :
-        proc.op === "-" ? minusPrim(args) :
-            proc.op === "*" ? (list_1.allT(L3_ast_1.isNumber, args) ? ramda_1.reduce(function (x, y) { return x * y; }, 1, args) : Error("* expects numbers only")) :
-                proc.op === "/" ? divPrim(args) :
-                    proc.op === ">" ? args[0] > args[1] :
-                        proc.op === "<" ? args[0] < args[1] :
-                            proc.op === "=" ? args[0] === args[1] :
-                                proc.op === "not" ? !args[0] :
-                                    proc.op === "eq?" ? eqPrim(args) :
-                                        proc.op === "string=?" ? args[0] === args[1] :
-                                            proc.op === "cons" ? consPrim(args[0], args[1]) :
-                                                proc.op === "car" ? carPrim(args[0]) :
-                                                    proc.op === "cdr" ? cdrPrim(args[0]) :
-                                                        proc.op === "list?" ? isListPrim(args[0]) :
-                                                            proc.op === "number?" ? typeof (args[0]) === 'number' :
-                                                                proc.op === "boolean?" ? typeof (args[0]) === 'boolean' :
-                                                                    proc.op === "symbol?" ? L3_value_1.isSymbolSExp(args[0]) :
-                                                                        proc.op === "string?" ? L3_ast_1.isString(args[0]) :
+    var values = args.map(forceValue);
+    return proc.op === "+" ? (list_1.allT(L3_ast_1.isNumber, values) ? ramda_1.reduce(function (x, y) { return x + y; }, 0, values) : Error("+ expects numbers only")) :
+        proc.op === "-" ? minusPrim(values) :
+            proc.op === "*" ? (list_1.allT(L3_ast_1.isNumber, values) ? ramda_1.reduce(function (x, y) { return x * y; }, 1, values) : Error("* expects numbers only")) :
+                proc.op === "/" ? divPrim(values) :
+                    proc.op === ">" ? values[0] > values[1] :
+                        proc.op === "<" ? values[0] < values[1] :
+                            proc.op === "=" ? values[0] === values[1] :
+                                proc.op === "not" ? !values[0] :
+                                    proc.op === "eq?" ? eqPrim(values) :
+                                        proc.op === "string=?" ? values[0] === values[1] :
+                                            proc.op === "cons" ? consPrim(values[0], values[1]) :
+                                                proc.op === "car" ? carPrim(values[0]) :
+                                                    proc.op === "cdr" ? cdrPrim(values[0]) :
+                                                        proc.op === "list?" ? isListPrim(values[0]) :
+                                                            proc.op === "number?" ? typeof (values[0]) === 'number' :
+                                                                proc.op === "boolean?" ? typeof (values[0]) === 'boolean' :
+                                                                    proc.op === "symbol?" ? L3_value_1.isSymbolSExp(values[0]) :
+                                                                        proc.op === "string?" ? L3_ast_1.isString(values[0]) :
                                                                             Error("Bad primitive op " + proc.op);
 };
 var minusPrim = function (args) {

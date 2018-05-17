@@ -25,9 +25,17 @@ import { makeProgram4 } from "./L4-ast";
 // Eval functions
 
 const forceValue = (val : Value4 | Error) : Value4 | Error => {
-        return isThunk(val)?
-            forceValue(evalExps(val.exp, val.env)) : 
-            val;
+    if (isThunk(val))
+        {
+            if (val.val === undefined)
+                if (isArray(val.exp))
+                    val.val = forceValue(evalExps(val.exp as CExp4[], val.env))
+                else
+                    val.val = forceValue(L4applicativeEval(val.exp as CExp4, val.env))
+
+            return val.val
+        }
+    else return val
 }
 
 const L4applicativeEval = (exp: CExp4 | Error, env: Env): Value4 | Error =>
@@ -43,16 +51,9 @@ const L4applicativeEval = (exp: CExp4 | Error, env: Env): Value4 | Error =>
     isLetExp4(exp) ? evalLet4(exp, env) :
     isLetrecExp4(exp) ? evalLetrec4(exp, env) :
     isSetExp4(exp) ? evalSet(exp, env) :
-    isAppExp4(exp) ? L4applyProcedure(L4applicativeEval(exp.rator, env),
-                                      map((rand) => L4applicativeEval(rand, env),
-                                          exp.rands)) :
+    isAppExp4(exp) ? L4evalAppExp_normal(exp, env) :
     Error(`Bad L4 AST ${exp}`);
 
-const L4normalEval = (exp: CExp4 | Error, env: Env): Value4 | Error =>{
-    return isAppExp4(exp) ? L4evalAppExp_normal(exp, env) :
-    
-    L4applicativeEval(exp, env)
-}
 
 const L4evalAppExp_normal = (exp: AppExp4, env: Env): Value4 | Error =>
 {
@@ -61,7 +62,7 @@ const L4evalAppExp_normal = (exp: AppExp4, env: Env): Value4 | Error =>
     
     return isError(proc) ? proc :
     !hasNoError(args) ? Error(`Bad argument: ${getErrorMessages(args)}`) :
-    isPrimOp(proc) ? applyPrimitive(proc, map(args, forceValue)) :
+    isPrimOp(proc) ? applyPrimitive(proc, args as Value4[]) :
     isClosure4(proc) ? L4applyClosure_normal(proc, args as Value4[]) :
     Error(`Bad procedure ${JSON.stringify(proc)}`);
 }
@@ -77,7 +78,7 @@ export const isTrueValue = (x: Value4 | Error): boolean | Error =>
     ! (x === false);
 
 const evalIf4 = (exp: IfExp4, env: Env): Value4 | Error => {
-    const test = L4applicativeEval(exp.test, env);
+    const test = forceValue(L4applicativeEval(exp.test, env));
     return isError(test) ? test :
         isTrueValue(test) ? L4applicativeEval(exp.then, env) :
         L4applicativeEval(exp.alt, env);
@@ -106,8 +107,8 @@ export const evalExps = (exps: Exp4[], env: Env): Value4 | Error =>
     isEmpty(exps) ? Error("Empty program") :
     isDefineExp4(first(exps)) ? evalDefineExps4(exps) :
    // isEmpty(rest(exps)) ? L4normalEval(first(exps), env) :
-    exps.length == 1 ? L4normalEval(first(exps), env) :
-    isError(L4normalEval(first(exps), env)) ? Error("error") :
+    exps.length == 1 ? L4applicativeEval(first(exps), env) :
+    isError(L4applicativeEval(first(exps), env)) ? Error("error") :
     evalExps(rest(exps), env);
 
 // L4-BOX @@
@@ -178,25 +179,30 @@ const evalSet = (exp: SetExp4, env: Env): Value4 | Error => {
 
 // @Pre: none of the args is an Error (checked in applyProcedure)
 export const applyPrimitive = (proc: PrimOp, args: Value4[]): Value4 | Error =>
-    proc.op === "+" ? (allT(isNumber, args) ? reduce((x, y) => x + y, 0, args) : Error("+ expects numbers only")) :
-    proc.op === "-" ? minusPrim(args) :
-    proc.op === "*" ? (allT(isNumber, args) ? reduce((x, y) => x * y, 1, args) : Error("* expects numbers only")) :
-    proc.op === "/" ? divPrim(args) :
-    proc.op === ">" ? args[0] > args[1] :
-    proc.op === "<" ? args[0] < args[1] :
-    proc.op === "=" ? args[0] === args[1] :
-    proc.op === "not" ? ! args[0] :
-    proc.op === "eq?" ? eqPrim(args) :
-    proc.op === "string=?" ? args[0] === args[1] :
-    proc.op === "cons" ? consPrim(args[0], args[1]) :
-    proc.op === "car" ? carPrim(args[0]) :
-    proc.op === "cdr" ? cdrPrim(args[0]) :
-    proc.op === "list?" ? isListPrim(args[0]) :
-    proc.op === "number?" ? typeof(args[0]) === 'number' :
-    proc.op === "boolean?" ? typeof(args[0]) === 'boolean' :
-    proc.op === "symbol?" ? isSymbolSExp(args[0]) :
-    proc.op === "string?" ? isString(args[0]) :
-    Error("Bad primitive op " + proc.op);
+{
+    let values = args.map(forceValue) as Value4[]
+
+    return proc.op === "+" ? (allT(isNumber, values) ? reduce((x, y) => x + y, 0, values) : Error("+ expects numbers only")) :
+    proc.op === "-" ? minusPrim(values) :
+    proc.op === "*" ? (allT(isNumber, values) ? reduce((x, y) => x * y, 1, values) : Error("* expects numbers only")) :
+    proc.op === "/" ? divPrim(values) :
+    proc.op === ">" ? values[0] > values[1] :
+    proc.op === "<" ? values[0] < values[1] :
+    proc.op === "=" ? values[0] === values[1] :
+    proc.op === "not" ? ! values[0] :
+    proc.op === "eq?" ? eqPrim(values) :
+    proc.op === "string=?" ? values[0] === values[1] :
+    proc.op === "cons" ? consPrim(values[0], values[1]) :
+    proc.op === "car" ? carPrim(values[0]) :
+    proc.op === "cdr" ? cdrPrim(values[0]) :
+    proc.op === "list?" ? isListPrim(values[0]) :
+    proc.op === "number?" ? typeof(values[0]) === 'number' :
+    proc.op === "boolean?" ? typeof(values[0]) === 'boolean' :
+    proc.op === "symbol?" ? isSymbolSExp(values[0]) :
+    proc.op === "string?" ? isString(values[0]) :
+    Error("Bad primitive op " + proc.op); 
+}
+    
 
 const minusPrim = (args: Value4[]): number | Error => {
     // TODO complete

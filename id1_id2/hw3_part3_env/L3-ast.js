@@ -28,7 +28,13 @@ exports.makeBoolExp = function (b) { return ({ tag: "BoolExp", val: b }); };
 exports.makeStrExp = function (s) { return ({ tag: "StrExp", val: s }); };
 exports.makePrimOp = function (op) { return ({ tag: "PrimOp", op: op }); };
 exports.makeVarRef = function (v) { return ({ tag: "VarRef", var: v }); };
-exports.makeVarDecl = function (v) { return ({ tag: "VarDecl", var: v }); };
+exports.makeVarDecl = function (v) {
+    if (exports.isArray(v))
+        // TODO: check if v[1] is "lazy"
+        return ({ tag: "VarDecl", var: v[0], isLazy: true });
+    else
+        return ({ tag: "VarDecl", var: v.toString(), isLazy: false });
+};
 exports.makeAppExp = function (rator, rands) {
     return ({ tag: "AppExp", rator: rator, rands: rands });
 };

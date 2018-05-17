@@ -131,6 +131,7 @@ console.log(parseL4("'()"));
 // TESTS
 
 // Test each data type literals
+
 assert.deepEqual(evalParse4("1"), 1);
 assert.deepEqual(evalParse4("#t"), true);
 assert.deepEqual(evalParse4("#f"), false);
@@ -475,3 +476,5 @@ assert.deepEqual(evalParse4(`
 (L4 (define compose (lambda (f g) (lambda (x) (f (g x)))))
     ((compose not number?) 2))`),
     false);
+
+console.log('finished Q3.2 tests')
