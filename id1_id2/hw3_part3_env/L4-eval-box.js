@@ -84,7 +84,8 @@ var applyClosure4 = function (proc, args) {
 exports.evalExps = function (exps, env) {
     return L3_ast_1.isEmpty(exps) ? Error("Empty program") :
         L4_ast_box_1.isDefineExp4(list_1.first(exps)) ? evalDefineExps4(exps) :
-            L3_ast_1.isEmpty(list_1.rest(exps)) ? L4normalEval(list_1.first(exps), env) :
+            // isEmpty(rest(exps)) ? L4normalEval(first(exps), env) :
+            exps.length == 1 ? L4normalEval(list_1.first(exps), env) :
                 error_1.isError(L4normalEval(list_1.first(exps), env)) ? Error("error") :
                     exports.evalExps(list_1.rest(exps), env);
 };

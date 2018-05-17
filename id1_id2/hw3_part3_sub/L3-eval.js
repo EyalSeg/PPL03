@@ -23,7 +23,6 @@ var L3applicativeEval = function (exp, env) {
                             L3_ast_2.isLitExp(exp) ? exp.val :
                                 L3_ast_2.isIfExp(exp) ? evalIf(exp, env) :
                                     L3_ast_2.isProcExp(exp) ? evalProc(exp, env) :
-                                        //if thunk appEval(thunk.exp, thunk.env)
                                         L3_ast_2.isAppExp(exp) ? evalAppExp_allowLazy(exp, env) :
                                             Error("Bad L3 AST " + exp);
 };
@@ -31,20 +30,20 @@ var evalAppExp_allowLazy = function (exp, env) {
     if (error_1.isError(exp))
         return exp;
     //!hasNoError(args) ? Error(`Bad argument: ${getErrorMessages(args)}`) :
-    if (L3_ast_2.isPrimOp(exp.rator)) {
-        var operator = L3applicativeEval(exp.rator, env);
+    var operator = L3applicativeEval(exp.rator, env);
+    if (L3_ast_2.isPrimOp(operator)) {
         return L3applyProcedure(operator, ramda_1.map(function (rand) { return L3applicativeEval(rand, env); }, exp.rands), env);
     }
-    if (L3_ast_2.isProcExp(exp.rator)) {
+    if (L3_value_1.isClosure(operator)) {
         var closure = L3applicativeEval(exp.rator, env);
-        var dec_and_rands = ramda_1.zip(exp.rator.args, exp.rands);
+        var dec_and_rands = ramda_1.zip(operator.params, exp.rands);
         var evaluated_args = dec_and_rands.map(function (tuple) {
             return tuple[0].isLazy ?
                 //valueToLitExp(tuple[1]) : 
                 tuple[1] :
                 valueToLitExp(L3applicativeEval(tuple[1], env));
         });
-        var vars = ramda_1.map(function (v) { return v.var; }, exp.rator.args);
+        var vars = ramda_1.map(function (v) { return v.var; }, operator.params);
         var body = exports.renameExps(closure.body);
         //let substituted = substitute(body, vars, evaluated_args)
         return L3_normal_1.evalExps(exports.substitute(body, vars, evaluated_args), env);

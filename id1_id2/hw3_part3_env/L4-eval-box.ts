@@ -105,7 +105,8 @@ const applyClosure4 = (proc: Closure4, args: Value4[]): Value4 | Error => {
 export const evalExps = (exps: Exp4[], env: Env): Value4 | Error =>
     isEmpty(exps) ? Error("Empty program") :
     isDefineExp4(first(exps)) ? evalDefineExps4(exps) :
-    isEmpty(rest(exps)) ? L4normalEval(first(exps), env) :
+   // isEmpty(rest(exps)) ? L4normalEval(first(exps), env) :
+    exps.length == 1 ? L4normalEval(first(exps), env) :
     isError(L4normalEval(first(exps), env)) ? Error("error") :
     evalExps(rest(exps), env);
 

@@ -30,7 +30,6 @@ const L3applicativeEval = (exp: CExp | Error, env: Env): Value | Error =>
     isLitExp(exp) ? exp.val :
     isIfExp(exp) ? evalIf(exp, env) :
     isProcExp(exp) ? evalProc(exp, env) :
-    //if thunk appEval(thunk.exp, thunk.env)
     isAppExp(exp) ? evalAppExp_allowLazy(exp, env) :
     Error(`Bad L3 AST ${exp}`);
 
@@ -38,23 +37,25 @@ const L3applicativeEval = (exp: CExp | Error, env: Env): Value | Error =>
 const evalAppExp_allowLazy=(exp : AppExp | Error, env : Env) : Value | Error =>{
     if (isError(exp)) return exp
     //!hasNoError(args) ? Error(`Bad argument: ${getErrorMessages(args)}`) :
-    if (isPrimOp(exp.rator))
+    
+    let operator = L3applicativeEval(exp.rator, env)  
+
+    if (isPrimOp(operator))
     {
-        let operator = L3applicativeEval(exp.rator, env)   
         return L3applyProcedure(
                                     operator, map((rand) => L3applicativeEval(rand, env), exp.rands),
                                     env)
     }
-    if (isProcExp(exp.rator)){
+    if (isClosure(operator)){
         let closure = L3applicativeEval(exp.rator, env) as Closure
-        let dec_and_rands = zip(exp.rator.args, exp.rands)
+        let dec_and_rands = zip(operator.params, exp.rands)
         let evaluated_args = dec_and_rands.map((tuple) => 
             tuple[0].isLazy? 
                 //valueToLitExp(tuple[1]) : 
                 tuple[1] :
                 valueToLitExp(L3applicativeEval(tuple[1], env) as Value))
 
-            let vars = map((v: VarDecl) => v.var, exp.rator.args);
+            let vars = map((v: VarDecl) => v.var, operator.params);
             let body = renameExps(closure.body);
 
             //let substituted = substitute(body, vars, evaluated_args)
