@@ -45,14 +45,7 @@ var evalAppExp_allowLazy = function (exp, env) {
         });
         var vars = ramda_1.map(function (v) { return v.var; }, operator.params);
         var body = exports.renameExps(closure.body);
-        //let substituted = substitute(body, vars, evaluated_args)
         return L3_normal_1.evalExps(exports.substitute(body, vars, evaluated_args), env);
-        //return L3normalApplyProc()
-        // if (substituted.length != 1)
-        //     console.log("CRITICAL ERROR!!!~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-        // return L3normalEval(substituted[0], env)
-        //let litArgs = map(valueToLitExp, args);
-        //return normalEvalExps(substitute(body, vars, evaluated_args), env)
     }
     return Error("Bad procedure " + JSON.stringify(exp));
 };

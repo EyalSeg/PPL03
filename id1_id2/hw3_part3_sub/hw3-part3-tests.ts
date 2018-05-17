@@ -266,4 +266,6 @@ assert.deepEqual(evalParse(`
     ((compose not number?) 2))`),
     false);
 
+    
+
 console.log("Finished custom tests.")

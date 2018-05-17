@@ -57,17 +57,8 @@ const evalAppExp_allowLazy=(exp : AppExp | Error, env : Env) : Value | Error =>{
 
             let vars = map((v: VarDecl) => v.var, operator.params);
             let body = renameExps(closure.body);
-
-            //let substituted = substitute(body, vars, evaluated_args)
-            
+           
             return normalEvalExps(substitute(body, vars, evaluated_args), env);
-            //return L3normalApplyProc()
-
-            // if (substituted.length != 1)
-            //     console.log("CRITICAL ERROR!!!~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-            // return L3normalEval(substituted[0], env)
-                //let litArgs = map(valueToLitExp, args);
-            //return normalEvalExps(substitute(body, vars, evaluated_args), env)
             }
       
     return Error("Bad procedure " + JSON.stringify(exp))
