@@ -150,4 +150,5 @@ assert.deepEqual(L3_eval_1.evalParse("\n(L3 (((lambda (f) (f f))\n      (lambda 
 assert.deepEqual(L3_eval_1.evalParse("\n(L3 (define map\n            (lambda (f l)\n              (if (eq? l '())\n                  l\n                  (cons (f (car l)) (map f (cdr l))))))\n    (map (lambda (x) (* x x))\n         '(1 2 3)))"), L3_value_1.makeCompoundSExp([1, 4, 9]));
 assert.deepEqual(L3_eval_1.evalParse("\n(L3 (define empty? (lambda (x) (eq? x '())))\n    (define filter\n        (lambda (pred l)\n            (if (empty? l)\n                l\n                (if (pred (car l))\n                    (cons (car l) (filter pred (cdr l)))\n                    (filter pred (cdr l))))))\n    (filter (lambda (x) (not (= x 2)))\n            '(1 2 3 2)))"), L3_value_1.makeCompoundSExp([1, 3]));
 assert.deepEqual(L3_eval_1.evalParse("\n(L3 (define compose (lambda (f g) (lambda (x) (f (g x)))))\n    ((compose not number?) 2))"), false);
+console.log("done");
 //# sourceMappingURL=L3-tests.js.map

@@ -56,7 +56,7 @@ export interface BoolExp {tag: "BoolExp"; val: boolean; };
 export interface StrExp {tag: "StrExp"; val: string; };
 export interface PrimOp {tag: "PrimOp"; op: string; };
 export interface VarRef {tag: "VarRef"; var: string; };
-export interface VarDecl {tag: "VarDecl"; var: string; };
+export interface VarDecl {tag: "VarDecl"; var: string; isLazy :boolean};
 export interface AppExp {tag: "AppExp"; rator: CExp; rands: CExp[]; };
 // L2
 export interface IfExp {tag: "IfExp"; test: CExp; then: CExp; alt: CExp; };
@@ -75,7 +75,14 @@ export const makeBoolExp = (b: boolean): BoolExp => ({tag: "BoolExp", val: b});
 export const makeStrExp = (s: string): StrExp => ({tag: "StrExp", val: s});
 export const makePrimOp = (op: string): PrimOp => ({tag: "PrimOp", op: op});
 export const makeVarRef = (v: string): VarRef => ({tag: "VarRef", var: v});
-export const makeVarDecl = (v: string): VarDecl => ({tag: "VarDecl", var: v});
+export const makeVarDecl = (v: string | string[]): VarDecl => {
+    if (isArray(v))     
+        // TODO: check if v[1] is "lazy"
+        return ({tag: "VarDecl", var: v[0], isLazy: true});
+    
+    else
+        return ({tag: "VarDecl", var: v.toString(), isLazy: false}) 
+}
 export const makeAppExp = (rator: CExp, rands: CExp[]): AppExp =>
     ({tag: "AppExp", rator: rator, rands: rands});
 // L2

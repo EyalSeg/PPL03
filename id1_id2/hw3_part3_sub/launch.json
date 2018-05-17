@@ -8,7 +8,7 @@
             "type": "node",
             "request": "launch",
             "name": "Launch Program",
-            "program": "${workspaceFolder}/hw3-part3-tests.ts",
+            "program": "${workspaceFolder}/L3-testss.ts",
             "outFiles": [
                 "${workspaceFolder}/**/*.js"
             ]

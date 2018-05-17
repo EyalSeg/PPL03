@@ -16,12 +16,27 @@ import { parseL4 } from "./L4-ast-box";
 import { applyEnv, applyEnvBdg, globalEnvAddBinding, makeExtEnv, setFBinding,
          theGlobalEnv, Env } from "./L4-env-box";
 import { isClosure4, isCompoundSExp4, isSExp4, makeClosure4, makeCompoundSExp4,
-         Closure4, CompoundSExp4, SExp4, Value4 } from "./L4-value-box";
+         Closure4, CompoundSExp4, SExp4, Value4, Thunk, isThunk, makeThunk } from "./L4-value-box";
 import { getErrorMessages, hasNoError, isError }  from "./error";
 import { allT, first, rest, second } from './list';
+import { makeProgram4 } from "./L4-ast";
 
 // ========================================================
 // Eval functions
+
+const forceValue = (val : Value4 | Error) : Value4 | Error => {
+    if (isThunk(val))
+        {
+            if (val.val === undefined)
+                if (isArray(val.exp))
+                    val.val = forceValue(evalExps(val.exp as CExp4[], val.env))
+                else
+                    val.val = forceValue(L4applicativeEval(val.exp as CExp4, val.env))
+
+            return val.val
+        }
+    else return val
+}
 
 const L4applicativeEval = (exp: CExp4 | Error, env: Env): Value4 | Error =>
     isError(exp)  ? exp :
@@ -36,17 +51,34 @@ const L4applicativeEval = (exp: CExp4 | Error, env: Env): Value4 | Error =>
     isLetExp4(exp) ? evalLet4(exp, env) :
     isLetrecExp4(exp) ? evalLetrec4(exp, env) :
     isSetExp4(exp) ? evalSet(exp, env) :
-    isAppExp4(exp) ? L4applyProcedure(L4applicativeEval(exp.rator, env),
-                                      map((rand) => L4applicativeEval(rand, env),
-                                          exp.rands)) :
+    isAppExp4(exp) ? L4evalAppExp_normal(exp, env) :
     Error(`Bad L4 AST ${exp}`);
 
+
+const L4evalAppExp_normal = (exp: AppExp4, env: Env): Value4 | Error =>
+{
+    let proc = forceValue(L4applicativeEval(exp.rator, env))
+    let args = map((rand) => makeThunk(rand, env), exp.rands)
+    
+    return isError(proc) ? proc :
+    !hasNoError(args) ? Error(`Bad argument: ${getErrorMessages(args)}`) :
+    isPrimOp(proc) ? applyPrimitive(proc, args as Value4[]) :
+    isClosure4(proc) ? L4applyClosure_normal(proc, args as Value4[]) :
+    Error(`Bad procedure ${JSON.stringify(proc)}`);
+}
+
+const L4applyClosure_normal = (proc: Closure4, args: Value4[]): Value4 | Error => {
+    let vars = map((v: VarDecl) => v.var, proc.params);
+    let newEnv = makeExtEnv(vars, args, proc.env)
+
+    return makeThunk(proc.body, newEnv)
+}
 export const isTrueValue = (x: Value4 | Error): boolean | Error =>
     isError(x) ? x :
     ! (x === false);
 
 const evalIf4 = (exp: IfExp4, env: Env): Value4 | Error => {
-    const test = L4applicativeEval(exp.test, env);
+    const test = forceValue(L4applicativeEval(exp.test, env));
     return isError(test) ? test :
         isTrueValue(test) ? L4applicativeEval(exp.then, env) :
         L4applicativeEval(exp.alt, env);
@@ -61,7 +93,7 @@ const evalProc4 = (exp: ProcExp4, env: Env): Closure4 =>
 const L4applyProcedure = (proc: Value4 | Error, args: Array<Value4 | Error>): Value4 | Error =>
     isError(proc) ? proc :
     !hasNoError(args) ? Error(`Bad argument: ${getErrorMessages(args)}`) :
-    isPrimOp(proc) ? applyPrimitive(proc, args) :
+    isPrimOp(proc) ? applyPrimitive(proc, map(args, forceValue)) :
     isClosure4(proc) ? applyClosure4(proc, args) :
     Error(`Bad procedure ${JSON.stringify(proc)}`);
 
@@ -74,7 +106,8 @@ const applyClosure4 = (proc: Closure4, args: Value4[]): Value4 | Error => {
 export const evalExps = (exps: Exp4[], env: Env): Value4 | Error =>
     isEmpty(exps) ? Error("Empty program") :
     isDefineExp4(first(exps)) ? evalDefineExps4(exps) :
-    isEmpty(rest(exps)) ? L4applicativeEval(first(exps), env) :
+   // isEmpty(rest(exps)) ? L4normalEval(first(exps), env) :
+    exps.length == 1 ? L4applicativeEval(first(exps), env) :
     isError(L4applicativeEval(first(exps), env)) ? Error("error") :
     evalExps(rest(exps), env);
 
@@ -146,25 +179,30 @@ const evalSet = (exp: SetExp4, env: Env): Value4 | Error => {
 
 // @Pre: none of the args is an Error (checked in applyProcedure)
 export const applyPrimitive = (proc: PrimOp, args: Value4[]): Value4 | Error =>
-    proc.op === "+" ? (allT(isNumber, args) ? reduce((x, y) => x + y, 0, args) : Error("+ expects numbers only")) :
-    proc.op === "-" ? minusPrim(args) :
-    proc.op === "*" ? (allT(isNumber, args) ? reduce((x, y) => x * y, 1, args) : Error("* expects numbers only")) :
-    proc.op === "/" ? divPrim(args) :
-    proc.op === ">" ? args[0] > args[1] :
-    proc.op === "<" ? args[0] < args[1] :
-    proc.op === "=" ? args[0] === args[1] :
-    proc.op === "not" ? ! args[0] :
-    proc.op === "eq?" ? eqPrim(args) :
-    proc.op === "string=?" ? args[0] === args[1] :
-    proc.op === "cons" ? consPrim(args[0], args[1]) :
-    proc.op === "car" ? carPrim(args[0]) :
-    proc.op === "cdr" ? cdrPrim(args[0]) :
-    proc.op === "list?" ? isListPrim(args[0]) :
-    proc.op === "number?" ? typeof(args[0]) === 'number' :
-    proc.op === "boolean?" ? typeof(args[0]) === 'boolean' :
-    proc.op === "symbol?" ? isSymbolSExp(args[0]) :
-    proc.op === "string?" ? isString(args[0]) :
-    Error("Bad primitive op " + proc.op);
+{
+    let values = args.map(forceValue) as Value4[]
+
+    return proc.op === "+" ? (allT(isNumber, values) ? reduce((x, y) => x + y, 0, values) : Error("+ expects numbers only")) :
+    proc.op === "-" ? minusPrim(values) :
+    proc.op === "*" ? (allT(isNumber, values) ? reduce((x, y) => x * y, 1, values) : Error("* expects numbers only")) :
+    proc.op === "/" ? divPrim(values) :
+    proc.op === ">" ? values[0] > values[1] :
+    proc.op === "<" ? values[0] < values[1] :
+    proc.op === "=" ? values[0] === values[1] :
+    proc.op === "not" ? ! values[0] :
+    proc.op === "eq?" ? eqPrim(values) :
+    proc.op === "string=?" ? values[0] === values[1] :
+    proc.op === "cons" ? consPrim(values[0], values[1]) :
+    proc.op === "car" ? carPrim(values[0]) :
+    proc.op === "cdr" ? cdrPrim(values[0]) :
+    proc.op === "list?" ? isListPrim(values[0]) :
+    proc.op === "number?" ? typeof(values[0]) === 'number' :
+    proc.op === "boolean?" ? typeof(values[0]) === 'boolean' :
+    proc.op === "symbol?" ? isSymbolSExp(values[0]) :
+    proc.op === "string?" ? isString(values[0]) :
+    Error("Bad primitive op " + proc.op); 
+}
+    
 
 const minusPrim = (args: Value4[]): number | Error => {
     // TODO complete
@@ -213,8 +251,8 @@ const cdrPrim = (v: Value4): Value4 | Error =>
     Error(`Cdr: param is not compound ${v}`);
 
 const consPrim = (v: Value4, lv: Value4): CompoundSExp4 | Error =>
-    isEmptySExp(lv) ? makeCompoundSExp4([v]) :
-    isCompoundSExp4(lv) ? makeCompoundSExp4([v].concat(lv.val)) :
+    isEmptySExp(lv) ? makeCompoundSExp4([v as SExp4]) :
+    isCompoundSExp4(lv) ? makeCompoundSExp4([v as SExp4].concat(lv.val)) :
     Error(`Cons: 2nd param is not empty or compound ${lv}`);
 
 const isListPrim = (v: Value4): boolean =>
@@ -228,9 +266,9 @@ export const evalL4program = (program: Program4): Value4 | Error =>
 export const evalParse4 = (s: string): Value4 | Error => {
     let ast: Parsed4 | Error = parseL4(s);
     if (isProgram4(ast)) {
-        return evalL4program(ast);
+        return forceValue(evalL4program(ast));
     } else if (isExp4(ast)) {
-        return evalExps([ast], theGlobalEnv);
+        return forceValue(evalExps([ast], theGlobalEnv));
     } else {
         return ast;
     }

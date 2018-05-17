@@ -9,8 +9,13 @@ import { isEmptySExp, isSymbolSExp, makeEmptySExp, makeSymbolSExp, EmptySExp, Sy
 import { CExp4 } from './L4-ast-box';
 import { Env } from './L4-env-box';
 
+export type Thunk = {tag: 'Thunk', exp: CExp4[] | CExp4, env: Env, val : Value4 | Error};
+export const isThunk = (x: any): x is Thunk => x.tag === 'Thunk';
+export const makeThunk = (exp: CExp4[], env: Env) : Thunk => 
+    {return {tag:'Thunk', exp: exp, env : env, val: undefined}}
+
 // Add void for value of side-effect expressions - set! and define
-export type Value4 = SExp4 | Closure4 | undefined;
+export type Value4 = SExp4 | Closure4 | Thunk | undefined;
 
 export type Functional = PrimOp | Closure4;
 export const isFunctional = (x: any): x is Functional => isPrimOp(x) || isClosure4(x);

@@ -28,7 +28,7 @@ exports.L3normalEval = function (exp, env) {
                                     L3_ast_2.isProcExp(exp) ? L3_value_1.makeClosure(exp.args, exp.body) :
                                         // This is the difference between applicative-eval and normal-eval
                                         // Substitute the arguments into the body without evaluating them first.
-                                        L3_ast_2.isAppExp(exp) ? L3normalApplyProc(exports.L3normalEval(exp.rator, env), exp.rands, env) :
+                                        L3_ast_2.isAppExp(exp) ? exports.L3normalApplyProc(exports.L3normalEval(exp.rator, env), exp.rands, env) :
                                             Error("Bad ast: " + exp);
 };
 var evalIf = function (exp, env) {
@@ -45,7 +45,7 @@ Purpose: Apply a procedure to NON evaluated arguments.
 Signature: L3-normalApplyProcedure(proc, args)
 Pre-conditions: proc must be a prim-op or a closure value
 */
-var L3normalApplyProc = function (proc, args, env) {
+exports.L3normalApplyProc = function (proc, args, env) {
     if (error_1.isError(proc)) {
         return proc;
     }
@@ -87,16 +87,16 @@ For other expressions (that have no side-effect), execute the expressions sequen
 Signature: L3normalEvalProgram(program)
 Type: [Program -> Value]
 */
-exports.L3normalEvalProgram = function (program) {
-    return evalExps(program.exps, L3_env_1.makeEmptyEnv());
+var L3normalEvalProgram = function (program) {
+    return exports.evalExps(program.exps, L3_env_1.makeEmptyEnv());
 };
 // Evaluate a sequence of expressions (in a program)
-var evalExps = function (exps, env) {
+exports.evalExps = function (exps, env) {
     return L3_ast_1.isEmpty(exps) ? Error("Empty program") :
         L3_ast_2.isDefineExp(list_1.first(exps)) ? evalDefineExps(exps, env) :
             L3_ast_1.isEmpty(list_1.rest(exps)) ? exports.L3normalEval(list_1.first(exps), env) :
                 error_1.isError(exports.L3normalEval(list_1.first(exps), env)) ? Error("error") :
-                    evalExps(list_1.rest(exps), env);
+                    exports.evalExps(list_1.rest(exps), env);
 };
 // Eval a sequence of expressions when the first exp is a Define.
 // Compute the rhs of the define, extend the env with the new binding
@@ -108,19 +108,20 @@ var evalDefineExps = function (exps, env) {
         return rhs;
     else {
         var newEnv = L3_env_1.makeEnv(def.var.var, rhs, env);
-        return evalExps(list_1.rest(exps), newEnv);
+        return exports.evalExps(list_1.rest(exps), newEnv);
     }
 };
 exports.evalNormalParse = function (s) {
     var ast = L3_ast_3.parseL3(s);
     if (L3_ast_2.isProgram(ast)) {
-        return exports.L3normalEvalProgram(ast);
+        return L3normalEvalProgram(ast);
     }
     else if (L3_ast_2.isExp(ast)) {
-        return evalExps([ast], L3_env_1.makeEmptyEnv());
+        return exports.evalExps([ast], L3_env_1.makeEmptyEnv());
     }
     else {
         return ast;
     }
 };
+console.log("DONE!");
 //# sourceMappingURL=L3-normal.js.map

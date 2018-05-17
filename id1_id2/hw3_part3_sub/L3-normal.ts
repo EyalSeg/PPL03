@@ -53,7 +53,7 @@ Purpose: Apply a procedure to NON evaluated arguments.
 Signature: L3-normalApplyProcedure(proc, args)
 Pre-conditions: proc must be a prim-op or a closure value
 */
-const L3normalApplyProc = (proc: Value | Error, args: CExp[], env: Env): Value | Error => {
+export const L3normalApplyProc = (proc: Value | Error, args: CExp[], env: Env): Value | Error => {
     if (isError(proc)) {
         return proc;
     } else if (isPrimOp(proc)) {
@@ -94,11 +94,11 @@ For other expressions (that have no side-effect), execute the expressions sequen
 Signature: L3normalEvalProgram(program)
 Type: [Program -> Value]
 */
-export const L3normalEvalProgram = (program: Program): Value | Error =>
+const L3normalEvalProgram = (program: Program): Value | Error =>
     evalExps(program.exps, makeEmptyEnv());
 
 // Evaluate a sequence of expressions (in a program)
-const evalExps = (exps: Exp[], env: Env): Value | Error =>
+export const evalExps = (exps: Exp[], env: Env): Value | Error =>
     isEmpty(exps) ? Error("Empty program") :
     isDefineExp(first(exps)) ? evalDefineExps(exps, env) :
     isEmpty(rest(exps)) ? L3normalEval(first(exps), env) :
@@ -130,3 +130,4 @@ export const evalNormalParse = (s: string): Value | Error => {
     }
 }
 
+console.log("DONE!")

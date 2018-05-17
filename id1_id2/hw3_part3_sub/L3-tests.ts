@@ -75,7 +75,6 @@ assert.deepEqual(evalParse('"a"'), "a");
 assert.deepEqual(evalParse("'()"), makeEmptySExp());
 assert.deepEqual(evalParse("'(1 2)"), makeCompoundSExp([1, 2]));
 assert.deepEqual(evalParse("'(1 (2))"), makeCompoundSExp([1, makeCompoundSExp([2])]));
-
 // Test primitives
 /*
 ;; <prim-op>  ::= + | - | * | / | < | > | = | not |  eq? | string=?
@@ -83,6 +82,7 @@ assert.deepEqual(evalParse("'(1 (2))"), makeCompoundSExp([1, makeCompoundSExp([2
 ;;                  | boolean? | symbol? | string?      ##### L3
 */
 assert.deepEqual(evalParse("(+ 1 2)"), 3);
+
 assert.deepEqual(evalParse("(- 2 1)"), 1);
 assert.deepEqual(evalParse("(* 2 3)"), 6);
 assert.deepEqual(evalParse("(/ 4 2)"), 2);
@@ -253,3 +253,4 @@ assert.deepEqual(evalParse(`
     ((compose not number?) 2))`),
     false);
 
+console.log("done")
